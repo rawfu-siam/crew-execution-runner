@@ -5,20 +5,36 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "crew-execution-runner"
 version = "0.1.0"
-description = "Production-grade backend for autonomous B2B lead research and Slack operatiosn crew"
+description = "Production-grade backend for autonomous B2B lead research and Slack operations crew"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-    { name = "Rawfu Siam", email = "rawfusiam2006@gmail.com"}
+    { name = "Rawfu Siam", email = "rawfusiam2006@gmail.com" }
 ]
 classifiers = [
-    "Programming Language :: Python "" 3",
-    "Programming Language :: Python "" 3.10",
-    "Programming Language :: Python "" 3.11",
-    "Programming Language :: Python "" 3.12",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
 ]
 
-[tool.setuptools.package.find]
+[tool.setuptools.packages.find]
 include = ["config*", "src*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E402",  # module level import not at top of file
+    "F401",  # imported but unused
+    "B904",  # raise from None / exception chaining
+]
+ignore = []
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
