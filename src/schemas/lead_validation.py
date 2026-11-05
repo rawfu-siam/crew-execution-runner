@@ -3,7 +3,7 @@ Strict Pydantic models for validated data parsing and crew output conformation.
 Eliminates agent hallucinations and guarantees type safety before database/webhook transmission.
 """
 
-# from typing import Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -30,3 +30,17 @@ class CrewAnalysisOutput(BaseModel):
     confidence_score: float = Field(
         ..., ge=0.0, le=1.0, description="Confidence score between 0.0 and 1.0"
     )
+
+
+class LeadRecordResponse(BaseModel):
+    """Response schema returning lead record details after successful processing."""
+
+    id: int
+    company_name: str
+    target_url: str
+    status: str
+    bottlenecks: Optional[str] = None
+    proposed_solution: Optional[str] = None
+    confidence_score: Optional[float] = None
+
+    model_config = {"from_attributes": True}
