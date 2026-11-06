@@ -54,3 +54,41 @@ class SlackBlockBuilder:
         ]
 
         return {"blocks": blocks}
+
+    @staticmethod
+    def build_success_notification(
+        company_name: str, confidence_score: float, solution_summary: str
+    ) -> Dict[str, Any]:
+        """
+        Constructs a rich Block Kit payload for successful lead research completions.
+        """
+        blocks: List[Dict[str, Any]] = [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": f"✅ Lead Research Success: {company_name[:100]}",
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {"type": "mrkdwn", "text": f"*Target Company:*\n{company_name}"},
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Confidence Score:*\n{confidence_score * 100:.1f}%",
+                    },
+                ],
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Proposed Solution Summary:*\n{solution_summary[:2800]}",
+                },
+            },
+            {"type": "divider"},
+        ]
+
+        return {"blocks": blocks}
