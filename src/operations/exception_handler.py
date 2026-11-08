@@ -8,8 +8,7 @@ import traceback
 from typing import Optional, Dict, Any
 
 from src.operations.slack_client import SlackClient
-
-# from src.schemas.slack_blocks import SlackBlockBuilder
+from src.schemas.slack_blocks import SlackBlockBuilder
 from src.utils.logger import logger
 
 
@@ -41,3 +40,21 @@ class ExceptionHandler:
 
         logger.error(f"Captured critical exception [{error_title}]: {exception}")
         logger.debug(f"Full traceback:\n{tb_string}")
+
+        error_msg = f"{str(exception)}"
+        if context_data:
+            context_str = "\n".join([f"• *{k}:* {v}" for k, v in context_data.items()])
+            error_msg = f"{error_msg}\n\n*Context Data:*\n{context_str}"
+
+        slack_payload = SlackBlockBuilder.build_error_alert(
+            error_title=error_title,
+            error_message=error_msg,
+            traceback_str=tb_string,
+        )
+
+        dispatch_success = await self.slack_client.send_payload(slack_payload)
+        return dispatch_success
+
+
+# Global exception handler instance for application-wide use
+exception_handler = ExceptionHandler()
