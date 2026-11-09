@@ -7,6 +7,7 @@ Pydantic output conformance for automated lead analysis.
 from crewai import Task
 
 from src.crew.agents import LeadResearchAgents
+from src.schemas.lead_validation import CrewAnalysisOutput
 
 
 class LeadResearchTasks:
@@ -35,4 +36,24 @@ class LeadResearchTasks:
                 "inefficiencies, and technical gaps discovered during the website review."
             ),
             agent=agent,
+        )
+
+    def design_solution_task(self, company_name: str) -> Task:
+        """
+        Defines the solution architecture task for drafting a tailored automation proposal
+        and enforcing strict Pydantic output schema validation.
+        """
+        agent = self.agents.solution_architect_agent()
+        return Task(
+            description=(
+                f"Synthesize the audit findings for {company_name} into a professional, high-impact "
+                f"AI automation solution proposal. Calculate a precise confidence score (between 0.0 and 1.0) "
+                f"reflecting feasibility and implementation ROI."
+            ),
+            expected_output=(
+                "A structured JSON response conforming strictly to the CrewAnalysisOutput schema, "
+                "containing the company name, identified bottlenecks, proposed solution, and confidence score."
+            ),
+            agent=agent,
+            output_json=CrewAnalysisOutput,
         )
