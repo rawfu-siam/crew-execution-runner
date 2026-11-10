@@ -4,14 +4,20 @@ Orchestrates the multi-agent CrewAI lifecycle, handles database persistence
 of research results, triggers n8n webhooks, and integrates global exception handling.
 """
 
+import asyncio
+import json
 from typing import Optional, Dict, Any
 
+from crewai import Crew, Process
 from sqlalchemy.orm import Session
 
 from src.crew.agents import LeadResearchAgents
 from src.crew.tasks import LeadResearchTasks
 from src.database.connection import SessionLocal
 from src.database.models import LeadRecord
+
+# from src.operations.n8n_dispatcher import n8n_dispatcher
+from src.schemas.lead_validation import CrewAnalysisOutput
 from src.utils.logger import logger
 
 
@@ -53,5 +59,39 @@ class CrewManager:
                 f"Created lead record ID {lead_record.id} with status PROCESSING."
             )
 
+            # 2. Instantiate agents and tasks
+            analyzer_agent = self.agents_factory.website_analyzer_agent
+            architect_agent = self.agents_factory.solution_architect_agent
+
+            audit_task = self.tasks_factory.audit_website_task(company_name, target_url)
+            design_task = self.tasks_factory.design_solution_task(company_name)
+
+            # 3. Assemble and kickoff CrewAI crew off the main event loop thread
+            research_crew = Crew(
+                agents=[analyzer_agent, architect_agent],
+                tasks=[audit_task, design_task],
+                process=Process.sequential,
+                verbose=True,
+            )
+            logger.debug(
+                "Kicking off CrewAI execution asynchronously in thread pool..."
+            )
+            crew_output = await asyncio.to_thread(research_crew.kickoff)
+            logger.info("CrewAI execution completed successfully.")
+
+            # 4. Parse and validate output using Pydantic schema
+            raw_json = getattr(crew_output, "json_dict", None)
+            if not raw_json and hasattr(crew_output, "raw"):
+                try:
+                    raw_json = json.loads(crew_output.raw)
+                except (json.JSONDecodeError, TypeError) as parse_err:
+                    logger.warning(f"Crew raw output was not valid JSON: {parse_err}")
+
+            if not raw_json:
+                raise ValueError(
+                    f"Crew execution failed to return structured JSON. Output: {crew_output}"
+                )
+
+            validated_output = CrewAnalysisOutput(**raw_json)
         except:
             pass
