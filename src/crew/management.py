@@ -15,8 +15,8 @@ from src.crew.agents import LeadResearchAgents
 from src.crew.tasks import LeadResearchTasks
 from src.database.connection import SessionLocal
 from src.database.models import LeadRecord
-
-# from src.operations.n8n_dispatcher import n8n_dispatcher
+from src.operations.n8n_dispatcher import n8n_dispatcher
+from src.operations.exception_handler import exception_handler
 from src.schemas.lead_validation import CrewAnalysisOutput
 from src.utils.logger import logger
 
@@ -24,9 +24,9 @@ from src.utils.logger import logger
 class CrewManager:
     """Manager class responsible for orchestrating B2B lead research crew execution."""
 
-    def __init__(self):
-        self.agents_factory = LeadResearchAgents
-        self.tasks_factory = LeadResearchTasks
+    def __init__(self) -> None:
+        self.agents_factory = LeadResearchAgents()
+        self.tasks_factory = LeadResearchTasks()
 
     async def execute_lead_research(
         self, company_name: str, target_url: str, db: Optional[Session] = None
@@ -60,8 +60,8 @@ class CrewManager:
             )
 
             # 2. Instantiate agents and tasks
-            analyzer_agent = self.agents_factory.website_analyzer_agent
-            architect_agent = self.agents_factory.solution_architect_agent
+            analyzer_agent = self.agents_factory.website_analyzer_agent()
+            architect_agent = self.agents_factory.solution_architect_agent()
 
             audit_task = self.tasks_factory.audit_website_task(company_name, target_url)
             design_task = self.tasks_factory.design_solution_task(company_name)
@@ -73,6 +73,7 @@ class CrewManager:
                 process=Process.sequential,
                 verbose=True,
             )
+
             logger.debug(
                 "Kicking off CrewAI execution asynchronously in thread pool..."
             )
@@ -93,5 +94,56 @@ class CrewManager:
                 )
 
             validated_output = CrewAnalysisOutput(**raw_json)
-        except:
-            pass
+
+            # 5. Update database record with successful analysis findings
+            lead_record.bottlenecks = validated_output.bottlenecks
+            lead_record.proposed_solution = validated_output.proposed_solution
+            lead_record.confidence_score = validated_output.confidence_score
+            lead_record.status = "COMPLETED"
+            local_session.commit()
+            local_session.refresh(lead_record)
+            logger.info(f"Lead record ID {lead_record.id} updated to COMPLETED status.")
+
+            # 6. Dispatch successful payload to n8n CRM webhook
+            payload = {
+                "id": lead_record.id,
+                "company_name": validated_output.company_name,
+                "target_url": target_url,
+                "status": lead_record.status,
+                "bottlenecks": validated_output.bottlenecks,
+                "proposed_solution": validated_output.proposed_solution,
+                "confidence_score": validated_output.confidence_score,
+            }
+            await n8n_dispatcher.dispatch_lead(payload)
+
+            return payload
+
+        except Exception as e:
+            logger.error(
+                f"Error encountered during lead research execution for {company_name}: {e}"
+            )
+            if lead_record and local_session:
+                try:
+                    lead_record.status = "FAILED"
+                    local_session.commit()
+                except Exception as db_err:
+                    logger.error(
+                        f"Failed to update lead record status to FAILED: {db_err}"
+                    )
+
+            # Trigger global exception handler / Slack alert
+            context = {"company_name": company_name, "target_url": target_url}
+            await exception_handler.handle_exception(
+                exception=e,
+                error_title=f"Lead Research Execution Failed: {company_name}",
+                context_data=context,
+            )
+            return None
+
+        finally:
+            if should_close_session and local_session:
+                local_session.close()
+
+
+# Global crew manager instance for application-wide dependency injection
+crew_manager = CrewManager()
