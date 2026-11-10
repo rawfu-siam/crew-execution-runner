@@ -29,11 +29,15 @@ class CrewManager:
         self.tasks_factory = LeadResearchTasks()
 
     async def execute_lead_research(
-        self, company_name: str, target_url: str, db: Optional[Session] = None
+        self,
+        company_name: str,
+        target_url: str,
+        db: Optional[Session] = None,
+        lead_id: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Executes the multi-agent lead research pipeline for a given company and URL.
-        Handles database record creation/update, CrewAI execution, n8n dispatch,
+        Handles database record retrieval/creation, CrewAI execution, n8n dispatch,
         and global error interception.
         """
         logger.info(
@@ -46,18 +50,21 @@ class CrewManager:
 
         lead_record = None
         try:
-            # 1. Create initial PENDING lead record in database
-            lead_record = LeadRecord(
-                company_name=company_name,
-                target_url=target_url,
-                status="PROCESSING",
+            # 1. Load the record created by the API, or create one if called directly
+            lead_record = (
+                local_session.get(LeadRecord, lead_id) if lead_id is not None else None
             )
-            local_session.add(lead_record)
+            if lead_record is None:
+                lead_record = LeadRecord(
+                    company_name=company_name,
+                    target_url=target_url,
+                    status="PROCESSING",
+                )
+                local_session.add(lead_record)
+            lead_record.status = "PROCESSING"
             local_session.commit()
             local_session.refresh(lead_record)
-            logger.info(
-                f"Created lead record ID {lead_record.id} with status PROCESSING."
-            )
+            logger.info(f"Lead record ID {lead_record.id} status set to PROCESSING.")
 
             # 2. Instantiate agents and tasks
             analyzer_agent = self.agents_factory.website_analyzer_agent()
