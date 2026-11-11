@@ -114,3 +114,28 @@ async def trigger_lead_research(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to process lead research request.",
         ) from e
+
+
+@app.get(
+    "/api/v1/leads/{lead_id}",
+    response_model=LeadRecordResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_lead_record(
+    lead_id: int,
+    db: Session = Depends(get_db),
+) -> LeadRecordResponse:
+    """
+    Retrieves a stored lead research record by its unique database ID.
+    """
+    logger.debug(f"Fetching lead record ID: {lead_id}")
+    lead_record = db.query(LeadRecord).filter(LeadRecord.id == lead_id).first()
+
+    if not lead_record:
+        logger.warning(f"Lead record ID {lead_id} not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Lead record with ID {lead_id} not found.",
+        )
+
+    return LeadRecordResponse.model_validate(lead_record)
