@@ -34,8 +34,10 @@ COPY --from=builder /install /usr/local
 # Copy application source code (excluding items specified in .dockerignore)
 COPY . .
 
-# Create a non-privileged system user for secure execution
-RUN useradd -u 10001 runner && chown -R runner:runner /app
+# Create a non-privileged system user and pre-create owned data/log directories
+RUN useradd -u 10001 runner \
+    && mkdir -p /app/data /app/logs \
+    && chown -R runner:runner /app
 USER runner
 
 # Expose FastAPI application port
